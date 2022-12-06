@@ -10,6 +10,7 @@ from adafruit_bitmap_font import bitmap_font
 from adafruit_display_text import label
 import circuitpython_parse as urlparser
 import digitalio
+import random
 
 try:
     from secrets import secrets  # type: ignore
@@ -114,6 +115,89 @@ bitmapTileGrid = displayio.TileGrid(artworkBitmap, pixel_shader=palette)
 bitmapDisplayGroup = displayio.Group()
 bitmapDisplayGroup.append(bitmapTileGrid)
 
+GOLPalette = None
+
+GOL1Bitmap = None
+GOL1TileGrid = None
+GOL1Group = None
+
+GOL2Bitmap = None
+GOL2TileGrid = None
+GOL2Group = None
+
+@micropython.native
+def initGameOfLife():
+    print("Initing Game of Life")
+    print(gc.mem_free())
+
+    global GOlPalette, GOL1Bitmap, GOL1TileGrid, GOL1Group, GOL2Bitmap, GOL2TileGrid, GOL2Group
+
+    GOLPalette = displayio.Palette(2)
+    GOLPalette[0] = 0x000000
+    GOLPalette[1] = (
+        (0x0000ff if random.random() > .33 else 0) |
+        (0x00ff00 if random.random() > .33 else 0) |
+        (0xff0000 if random.random() > .33 else 0)) or 0xffffff
+
+    GOL1Bitmap = displayio.Bitmap(display.width, display.height, 2)
+    GOL1TileGrid = displayio.TileGrid(GOL1Bitmap, pixel_shader=GOLPalette)
+    GOL1Group = displayio.Group()
+    GOL1Group.append(GOL1TileGrid)
+
+    GOL2Bitmap = displayio.Bitmap(display.width, display.height, 2)
+    GOL2TileGrid = displayio.TileGrid(GOL2Bitmap, pixel_shader=GOLPalette)
+    GOL2Group = displayio.Group()
+    GOL2Group.append(GOL2TileGrid)
+
+    for x in range(0, GOL1Bitmap.width):
+        for y in range(0, GOL1Bitmap.height):
+            GOL1Bitmap[x, y] = 1 if random.randint(0, 6) == 0 else 0
+    
+    gc.collect()
+    print(gc.mem_free())
+
+@micropython.native
+def unInitGameOfLife():
+    print("Uniniting Game of Life")
+    print(gc.mem_free())
+    
+    global GOlPalette, GOL1Bitmap, GOL1TileGrid, GOL1Group, GOL2Bitmap, GOL2TileGrid, GOL2Group
+
+    GOLPalette = None
+
+    GOL1Bitmap = None
+    GOL1TileGrid = None
+    GOL1Group = None
+
+    GOL2Bitmap = None
+    GOL2TileGrid = None
+    GOL2Group = None
+    
+    gc.collect()
+    print(gc.mem_free())
+
+@micropython.native
+def runGameOfLife(old, new):
+    print("Running Game of Life")
+    print(gc.mem_free())
+    width = old.width
+    height = old.height
+    for y in range(height):
+        yyy = y * width
+        ym1 = ((y + height - 1) % height) * width
+        yp1 = ((y + 1) % height) * width
+        xm1 = width - 1
+        for x in range(width):
+            xp1 = (x + 1) % width
+            neighbors = (
+                old[xm1 + ym1] + old[xm1 + yyy] + old[xm1 + yp1] +
+                old[x   + ym1] +                  old[x   + yp1] +
+                old[xp1 + ym1] + old[xp1 + yyy] + old[xp1 + yp1])
+            new[x+yyy] = neighbors == 3 or (neighbors == 2 and old[x+yyy])
+            xm1 = x
+    gc.collect()
+    print(gc.mem_free())
+
 spotifyAccessToken = ""
 oldArtworkURL = ""
 print(gc.mem_free())
@@ -121,15 +205,18 @@ print(gc.mem_free())
 try:
     while True:
         playbackStatus = network.checkAnyDeviceActive(spotifyAccessToken)
-        if(playbackStatus == "ERROR"):
+
+        if(playbackStatus == -1): # Error
             spotifyAccessToken = network.getSpotifyAccessToken()
             continue
         
-        if(playbackStatus == "ACTIVE"):
+        if(playbackStatus == 1): # Active
+            if(GOL1Bitmap is not None): # Uninitialize the game of life if we are about to display artwork
+                unInitGameOfLife()
+
             gc.collect()
             print(gc.mem_free())
             artworkURL = network.getArtworkURL(spotifyAccessToken)
-
             if (artworkURL == "ERROR"):
                 gc.collect()
                 spotifyAccessToken = network.getSpotifyAccessToken()
@@ -139,6 +226,7 @@ try:
                 continue
 
             if (oldArtworkURL != artworkURL):
+                gc.collect()
                 artwork = network.getArtwork(display.height, display.width, redBits, greenBits, blueBits, brightness, contrast, artworkURL)
 
                 oldArtworkURL = artworkURL
@@ -160,10 +248,20 @@ try:
                 display.show(bitmapDisplayGroup)
             
             
-        if(playbackStatus == "IDLE"):
-            display.show(text_area)
-            text_area.text = "No active device"
-            time.sleep(20)
+        if(playbackStatus == 0): # Idle
+            if (GOL1Bitmap is None):
+                initGameOfLife()
+            for _ in range (0, 5):
+                display.show(GOL1Group)
+                runGameOfLife(GOL1Bitmap, GOL2Bitmap)
+                time.sleep(1)
+                display.show(GOL2Group)
+                runGameOfLife(GOL2Bitmap, GOL1Bitmap)
+                time.sleep(1)
+            
+            #display.show(text_area)
+            #text_area.text = "No active device"
+            #time.sleep(20)
 
 except Exception as e:
     from supervisor import reload

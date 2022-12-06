@@ -73,6 +73,8 @@ def getArtworkURL(spotifyAccessToken, attempts = 0):
         gc.collect()
         return artworkURL
     except Exception as e:
+        if(str(e) == "syntax error in JSON"):
+            return "ERROR"
         if(attempts > 3):
             print("Too many attempts")
             return "MAXATTEMPTS"
@@ -88,14 +90,14 @@ def checkAnyDeviceActive(spotifyAccessToken):
     if ("error" in deviceRequest):
         print("Error: " + deviceRequest["error"]["message"])
         gc.collect()
-        return "ERROR"
+        return -1 # Error
     for device in deviceRequest["devices"]:
         if device["is_active"]:
             print("Device " + device["name"] + " is active")
             gc.collect()
-            return "ACTIVE"
-    gc.collect()
-    return "IDLE"
+            return 1 # Active
+    #gc.collect()
+    return 0 # Idle
 
 @micropython.native
 def getSpotifyAccessToken():
