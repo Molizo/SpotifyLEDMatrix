@@ -6,10 +6,6 @@ import displayio
 from framebufferio import FramebufferDisplay
 from rgbmatrix import RGBMatrix
 import network
-from adafruit_bitmap_font import bitmap_font
-from adafruit_display_text import label
-import circuitpython_parse as urlparser
-import digitalio
 import random
 
 try:
@@ -18,18 +14,11 @@ except ImportError:
     print("Settings are kept in settings.py, please add them there!")
     raise
 
-upBtn = digitalio.DigitalInOut(board.BUTTON_UP)
-upBtn.direction = digitalio.Direction.INPUT
-upBtn.pull = digitalio.Pull.UP
-downBtn = digitalio.DigitalInOut(board.BUTTON_DOWN)
-downBtn.direction = digitalio.Direction.INPUT
-downBtn.pull = digitalio.Pull.UP
-
 displayio.release_displays()
 matrix = RGBMatrix(
     width=64,
     height=64,
-    bit_depth=4,
+    bit_depth=5,
     rgb_pins=[
         board.MTX_R1,   # type: ignore
         board.MTX_G1,   # type: ignore
@@ -51,9 +40,9 @@ matrix = RGBMatrix(
 )
 display = FramebufferDisplay(matrix)
 
-redBits = 6
-greenBits = 6
-blueBits = 6
+redBits = 8
+greenBits = 8
+blueBits = 8
 brightness = -0.3
 contrast = 0.3
 
@@ -71,33 +60,11 @@ del rawPalette
 
 gc.collect()
 
-font = bitmap_font.load_font("/resources/TruenoRg-8.bdf")
-
-text_area = label.Label(font, text=" "*60, color=0x0065A9, anchor_point=(0.0,0.0))
-text_area.text = "Starting up\n\n\n"
-
-# Set the location
-text_area.x = 0
-text_area.y = 4
-
-# Show it
-display.show(text_area)
-
-gc.collect()
-
-network.initWiFi(text_area)
+network.initWiFi()
 
 if ("spotify_refresh_token" not in secrets or secrets["spotify_refresh_token"] == ""):
-    text_area.text = "Spotify Account\nGuided Setup\n\nConnect to PC\nand open serial"
-
-    print("[Spotify Setup] Please go to https://accounts.spotify.com/authorize?client_id=%s&response_type=code&redirect_uri=%s&scope=user-read-currently-playing%%20user-read-playback-state" % (secrets["spotify_client_id"], secrets["spotify_redirect_uri"]))
-    callbackUrl = input("[Spotify Setup] Enter the URL from your browser's address bar after authorizing: ")
-    authorizationCode = urlparser.urlparse(callbackUrl)[4][5:] # Query is the 4th element in the urlparse tuple, and the code starts at the 5th index in the query string
-    refreshToken = network.getSpotifyRefreshToken(authorizationCode)
-    print("[Spotify Setup] spotify_refresh_token = " + refreshToken)
-
-    while True:
-        pass
+    import setupWizard
+    setupWizard.startSpotifySetup(display)
 
 @micropython.native
 def drawArtwork(artwork):
@@ -250,6 +217,7 @@ try:
             
         if(playbackStatus == 0): # Idle
             if (GOL1Bitmap is None):
+                oldArtworkURL = ""
                 initGameOfLife()
             for _ in range (0, 5):
                 display.show(GOL1Group)

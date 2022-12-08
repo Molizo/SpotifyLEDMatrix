@@ -14,7 +14,7 @@ except ImportError:
     raise
 
 @micropython.native
-def initWiFi(text_area):
+def initWiFi():
     esp32_cs = DigitalInOut(board.ESP_CS)
     esp32_ready = DigitalInOut(board.ESP_BUSY)
     esp32_reset = DigitalInOut(board.ESP_RESET)
@@ -27,7 +27,6 @@ def initWiFi(text_area):
     if esp.status == adafruit_esp32spi.WL_IDLE_STATUS:
         print("ESP32 found and in idle mode")
     print("Connecting to AP...")
-    text_area.text += secrets["ssid"] +'\n'
     while not esp.is_connected:
         try:
             esp.connect_AP(secrets["ssid"], secrets["password"])
@@ -36,7 +35,6 @@ def initWiFi(text_area):
             continue
     print("Connected to", str(esp.ssid, "utf-8"), "\tRSSI:", esp.rssi)
     print("My IP address is", esp.pretty_ip(esp.ip_address))
-    text_area.text += esp.pretty_ip(esp.ip_address) +'\n'
     gc.collect()
     return esp
 
