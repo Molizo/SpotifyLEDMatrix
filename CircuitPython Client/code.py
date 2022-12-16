@@ -40,11 +40,17 @@ matrix = RGBMatrix(
 )
 display = FramebufferDisplay(matrix)
 
+startNightTime = 1200 # In minutes, also factoring in timezones (use UTC time)
+endNightTime = 360 # In minutes, also factoring in timezones (use UTC time)
+dayBrightness = 0.0 # Use -0.3 w/o diffuser, 0.0 with diffuser
+nightBrightness = -0.7 # Number between -1.0 and +1.0 (negative numbers lower brightness, positive numbers increase brightness)
+
 redBits = 8
 greenBits = 8
 blueBits = 8
-brightness = -0.3
+brightness = nightBrightness
 contrast = 0.3
+
 
 rawPalette = []
 for red in range(0, 255, ceil(255/redBits)):
@@ -171,6 +177,7 @@ print(gc.mem_free())
 
 try:
     while True:
+
         playbackStatus = network.checkAnyDeviceActive(spotifyAccessToken)
 
         if(playbackStatus == -1): # Error
@@ -213,6 +220,15 @@ try:
                 gc.collect()
                 print(gc.mem_free())
                 display.show(bitmapDisplayGroup)
+
+                currentTime = network.getCurrentTime()
+                if (currentTime > startNightTime or currentTime < endNightTime):
+                    print("Using night brightness")
+                    brightness = nightBrightness
+                else:
+                    print("Using day brightness")
+                    brightness = dayBrightness
+                gc.collect()
             
             
         if(playbackStatus == 0): # Idle

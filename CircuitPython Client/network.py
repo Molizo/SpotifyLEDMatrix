@@ -13,8 +13,12 @@ except ImportError:
     print("Settings are kept in secrets.py, please add them there!")
     raise
 
+esp = None
+
 @micropython.native
 def initWiFi():
+    global esp
+
     esp32_cs = DigitalInOut(board.ESP_CS)
     esp32_ready = DigitalInOut(board.ESP_BUSY)
     esp32_reset = DigitalInOut(board.ESP_RESET)
@@ -35,8 +39,26 @@ def initWiFi():
             continue
     print("Connected to", str(esp.ssid, "utf-8"), "\tRSSI:", esp.rssi)
     print("My IP address is", esp.pretty_ip(esp.ip_address))
+
     gc.collect()
     return esp
+
+@micropython.native
+def getCurrentTime():
+    try:
+        gc.collect()
+        print("Getting current time...")
+        time = int(requests.get("https://currentmillis.com/time/minutes-since-unix-epoch.php").text) % 1440 # Minutes in day
+        print("Got time: %i" % time)
+        return time 
+    except Exception as e:
+        if(attempts > 3):
+            print("Too many attempts")
+            return "MAXATTEMPTS"
+        print(gc.mem_free())
+        gc.collect()
+        print("Retrying %i/3: " % attempts, e)
+        return getCurrentTime()
 
 @micropython.native
 def getArtwork(h, w, r, g, b, bright, contr, artworkURL, attempts = 0):
@@ -55,7 +77,6 @@ def getArtwork(h, w, r, g, b, bright, contr, artworkURL, attempts = 0):
         print("Retrying %i/3: " % attempts, e)
         return getArtwork(h, w, r, g, b, bright, contr, artworkURL, attempts+1)
     
-
 @micropython.native
 def getArtworkURL(spotifyAccessToken, attempts = 0):
     try:
